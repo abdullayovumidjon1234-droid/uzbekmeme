@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MEME</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237c3aed'/%3E%3Ctext x='32' y='43' font-size='32' font-weight='900' text-anchor='middle' fill='white' font-family='Arial'%3EM%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--ink:#140b24;--choc:#2b1810;--neon:#a855f7}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,Arial,sans-serif;color:#f3e8ff;min-height:100vh;background:radial-gradient(circle at 20% 0,#3b1d6e 0,#140b24 45%,#2b1810 100%)}
+.wrap{max-width:1100px;margin:0 auto;padding:12px}
+.glass{background:rgba(255,255,255,.07);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:18px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px;position:sticky;top:8px;z-index:5}
+.logo{font-size:26px;font-weight:900;background:linear-gradient(135deg,#c084fc,#6d28d9);-webkit-background-clip:text;color:transparent}
+input,select,button{font:inherit;color:inherit}
+input,select{background:rgba(0,0,0,.35);border:0;border-radius:12px;padding:9px 12px;outline:none}
+input:focus{box-shadow:0 0 0 2px var(--neon)}
+button{background:rgba(168,85,247,.8);border:0;border-radius:12px;padding:9px 14px;cursor:pointer}
+button.ghost{background:rgba(255,255,255,.08)}
+button.on{background:var(--neon);box-shadow:0 0 14px rgba(168,85,247,.6)}
+button:hover{filter:brightness(1.15)}
+.grow{flex:1;min-width:140px}
+h1{text-align:center;font-size:clamp(26px,5vw,42px);margin:28px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+.card{padding:10px;display:flex;flex-direction:column;gap:8px}
+.thumb{aspect-ratio:1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:44px;background:linear-gradient(135deg,rgba(124,58,237,.5),rgba(120,53,15,.5))}
+.msg{text-align:center;color:#fcd34d;min-height:22px}
+.auth{max-width:340px;margin:0 auto 20px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.hide{display:none!important}
+.studio{padding:14px;margin-top:26px;display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:800px){.studio{grid-template-columns:1fr 1fr}}
+canvas{width:100%;border-radius:12px;background:#000}
+.ctl{display:flex;flex-direction:column;gap:8px}
+footer{text-align:center;opacity:.6;padding:30px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="glass">
+  <span class="logo">MEME</span>
+  <input id="q" class="grow" data-ph="search">
+  <select id="lang"><option value="en">EN</option><option value="uz">UZ</option><option value="ru">RU</option></select>
+  <span id="wallet"></span>
+  <button id="logout" class="hide" data-t="logout"></button>
+</header>
+
+<h1 data-t="hero"></h1>
+<p id="cfgwarn" class="msg hide"></p>
+
+<div id="authbox" class="glass auth">
+  <input id="un" class="hide" data-ph="username">
+  <input id="em" type="email" data-ph="email">
+  <input id="pw" type="password" data-ph="password">
+  <button id="go"></button>
+  <button id="swap" class="ghost"></button>
+  <button id="forgot" class="ghost" data-t="forgot"></button>
+</div>
+<p id="msg" class="msg"></p>
+
+<div class="row">
+  <div><button data-tab="memes" class="ghost" data-t="memes"></button> <button data-tab="songs" class="ghost" data-t="songs"></button> <button data-tab="all" class="on" data-t="all"></button></div>
+  <div><button data-sort="popular" class="ghost" data-t="popular"></button> <button data-sort="oldest" class="ghost" data-t="oldest"></button> <button data-sort="newest" class="on" data-t="newest"></button></div>
+</div>
+<div id="list" class="grid"></div>
+
+<section class="glass studio">
+  <div><canvas id="cv" width="600" height="600"></canvas></div>
+  <div class="ctl">
+    <h2 data-t="studio" style="margin:0"></h2>
+    <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+    <input id="top" data-ph="topText">
+    <input id="bot" data-ph="bottomText">
+    <label><span data-t="size"></span> <input id="size" type="range" min="16" max="110" value="52"></label>
+    <label><span data-t="color"></span> <input id="color" type="color" value="#ffffff"></label>
+    <div><button class="ghost stk">😂</button> <button class="ghost stk">🔥</button> <button class="ghost stk">💀</button> <button class="ghost stk">😎</button> <button class="ghost" id="clr" data-t="clear"></button></div>
+    <button id="dl" data-t="saveimg"></button>
+  </div>
+</section>
+<footer>© MEME</footer>
+</div>
+
+<script>
+// ====== CONFIG: paste your Supabase values (anon key only, never the service key) ======
+const SUPABASE_URL = "";
+const SUPABASE_ANON_KEY = "";
+// =======================================================================================
+
+const T = {
+ en:{hero:"Make it. Share it. Laugh.",memes:"MEMES",songs:"MEME SONGS",all:"EVERYTHING",popular:"Popular",oldest:"Oldest",newest:"Newest",login:"Log in",register:"Sign up",noacc:"No account? Sign up",haveacc:"Have an account? Log in",logout:"Log out",forgot:"Forgot password",search:"Search memes...",email:"Email",password:"Password (min 8)",username:"Username (min 3)",free:"Free",tokens:"Tokens",download:"Download",empty:"Nothing here yet.",loading:"Loading...",needLogin:"Please log in first.",noTokens:"Not enough tokens. Token purchase is not enabled yet.",err:"Something went wrong.",invalid:"Check your email, password and username.",checkMail:"Check your email.",sent:"Reset link sent to your email.",studio:"Meme Studio",topText:"Top text",bottomText:"Bottom text",size:"Font size",color:"Color",clear:"Reset",saveimg:"Download meme (PNG)",nocfg:"Supabase is not configured: set SUPABASE_URL and SUPABASE_ANON_KEY in this file. The meme studio works without it."},
+ uz:{hero:"Yarating. Ulashing. Kuling.",memes:"MEMLAR",songs:"MEM QO'SHIQLARI",all:"HAMMASI",popular:"Mashhur",oldest:"Eng eski",newest:"Eng yangi",login:"Kirish",register:"Ro'yxatdan o'tish",noacc:"Akkaunt yo'qmi? Ro'yxatdan o'ting",haveacc:"Akkaunt bormi? Kiring",logout:"Chiqish",forgot:"Parolni tiklash",search:"Memlarni qidiring...",email:"Email",password:"Parol (kamida 8)",username:"Foydalanuvchi nomi (kamida 3)",free:"Bepul",tokens:"Tokenlar",download:"Yuklab olish",empty:"Hozircha hech narsa yo'q.",loading:"Yuklanmoqda...",needLogin:"Avval tizimga kiring.",noTokens:"Tokenlar yetarli emas. Token sotib olish hali yoqilmagan.",err:"Xatolik yuz berdi.",invalid:"Email, parol va nomni tekshiring.",checkMail:"Emailingizni tekshiring.",sent:"Tiklash havolasi emailingizga yuborildi.",studio:"Mem studiyasi",topText:"Yuqoridagi matn",bottomText:"Pastdagi matn",size:"Shrift hajmi",color:"Rang",clear:"Tozalash",saveimg:"Memni yuklab olish (PNG)",nocfg:"Supabase sozlanmagan: shu fayldagi SUPABASE_URL va SUPABASE_ANON_KEY ni kiriting. Mem studiyasi sozlamasiz ishlaydi."},
+ ru:{hero:"Создавай. Делись. Смейся.",memes:"МЕМЫ",songs:"МЕМ-ПЕСНИ",all:"ВСЁ",popular:"Популярные",oldest:"Старые",newest:"Новые",login:"Войти",register:"Регистрация",noacc:"Нет аккаунта? Регистрация",haveacc:"Есть аккаунт? Войти",logout:"Выйти",forgot:"Забыли пароль",search:"Поиск мемов...",email:"Эл. почта",password:"Пароль (мин. 8)",username:"Имя пользователя (мин. 3)",free:"Бесплатно",tokens:"Токены",download:"Скачать",empty:"Пока ничего нет.",loading:"Загрузка...",needLogin:"Сначала войдите.",noTokens:"Недостаточно токенов. Покупка токенов пока не включена.",err:"Что-то пошло не так.",invalid:"Проверьте почту, пароль и имя.",checkMail:"Проверьте почту.",sent:"Ссылка для сброса отправлена на почту.",studio:"Мем-студия",topText:"Верхний текст",bottomText:"Нижний текст",size:"Размер шрифта",color:"Цвет",clear:"Сбросить",saveimg:"Скачать мем (PNG)",nocfg:"Supabase не настроен: укажите SUPABASE_URL и SUPABASE_ANON_KEY в этом файле. Мем-студия работает и без него."}
+};
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+let lang = localStorage.getItem("lang") || "en", tab = "all", sort = "newest", signup = false, user = null, wallet = null;
+const t = k => T[lang][k];
+const sb = (SUPABASE_URL && SUPABASE_ANON_KEY) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const msg = s => $("#msg").textContent = s || "";
+
+function applyLang() {
+  document.documentElement.lang = lang; $("#lang").value = lang;
+  $$("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
+  $$("[data-ph]").forEach(e => e.placeholder = t(e.dataset.ph));
+  $("#go").textContent = signup ? t("register") : t("login");
+  $("#swap").textContent = signup ? t("haveacc") : t("noacc");
+  $("#un").classList.toggle("hide", !signup);
+  renderWallet(); load(); draw();
+  if (!sb) { $("#cfgwarn").textContent = t("nocfg"); $("#cfgwarn").classList.remove("hide"); }
+}
+$("#lang").onchange = e => { lang = e.target.value; localStorage.setItem("lang", lang); applyLang(); };
+$("#swap").onclick = () => { signup = !signup; applyLang(); };
+
+function renderWallet() { $("#wallet").textContent = wallet ? `${t("free")}: ${wallet.free_downloads} · ${t("tokens")}: ${wallet.tokens}` : ""; }
+async function loadWallet() {
+  if (!sb || !user) { wallet = null; return renderWallet(); }
+  const { data } = await sb.from("profiles").select("free_downloads,tokens").eq("id", user.id).maybeSingle();
+  wallet = data; renderWallet();
+}
+function setUser(u) {
+  user = u; $("#authbox").classList.toggle("hide", !!u); $("#logout").classList.toggle("hide", !u); loadWallet();
+}
+if (sb) {
+  sb.auth.getSession().then(({ data }) => setUser(data.session?.user ?? null));
+  sb.auth.onAuthStateChange((_e, s) => setUser(s?.user ?? null));
+}
+$("#go").onclick = async () => {
+  msg(""); if (!sb) return msg(t("nocfg"));
+  const email = $("#em").value.trim(), password = $("#pw").value, username = $("#un").value.trim();
+  if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 8 || (signup && !/^[A-Za-z0-9_]{3,30}$/.test(username))) return msg(t("invalid"));
+  const r = signup ? await sb.auth.signUp({ email, password, options: { data: { username } } }) : await sb.auth.signInWithPassword({ email, password });
+  if (r.error) return msg(r.error.message);
+  if (signup && !r.data.session) msg(t("checkMail"));
+};
+$("#forgot").onclick = async () => {
+  const email = $("#em").value.trim(); if (!sb || !email) return msg(t("invalid"));
+  const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.href.split("#")[0] });
+  msg(r.error ? r.error.message : t("sent"));
+};
+$("#logout").onclick = () => sb.auth.signOut();
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+async function load() {
+  const box = $("#list");
+  if (!sb) { box.innerHTML = `<p class="msg" style="grid-column:1/-1">${t("empty")}</p>`; return; }
+  box.innerHTML = `<p class="msg" style="grid-column:1/-1">${t("loading")}</p>`;
+  let q = sb.from("memes").select("id,title,kind,likes_count,created_at").eq("is_removed", false).limit(48);
+  if (tab === "memes") q = q.in("kind", ["image", "gif", "video"]);
+  if (tab === "songs") q = q.eq("kind", "song");
+  const s = $("#q").value.trim().replace(/[%_,()]/g, "");
+  if (s) q = q.ilike("title", `%${s}%`);
+  q = sort === "popular" ? q.order("likes_count", { ascending: false }) : q.order("created_at", { ascending: sort === "oldest" });
+  const { data, error } = await q;
+  if (error) { box.innerHTML = `<p class="msg" style="grid-column:1/-1">${t("err")}</p>`; return; }
+  if (!data.length) { box.innerHTML = `<p class="msg" style="grid-column:1/-1">${t("empty")}</p>`; return; }
+  box.innerHTML = data.map(m => `<div class="glass card"><div class="thumb">${m.kind === "song" ? "🎵" : "😂"}</div><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.title)}</b><button data-dl="${m.id}">${t("download")} · ${m.kind === "song" ? 2 : 3}</button></div>`).join("");
+}
+$("#list").onclick = async e => {
+  const id = e.target.dataset.dl; if (!id) return; msg("");
+  if (!user) return msg(t("needLogin"));
+  const { data: path, error } = await sb.rpc("consume_download", { p_item: id });
+  if (error) return msg(error.message.includes("insufficient") ? t("noTokens") : t("err"));
+  const { data: signed, error: e2 } = await sb.storage.from("media").createSignedUrl(path, 60);
+  if (e2) return msg(t("err"));
+  loadWallet(); location.href = signed.signedUrl;
+};
+let timer; $("#q").oninput = () => { clearTimeout(timer); timer = setTimeout(load, 300); };
+$$("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; $$("[data-tab]").forEach(x => x.className = x === b ? "on" : "ghost"); load(); });
+$$("[data-sort]").forEach(b => b.onclick = () => { sort = b.dataset.sort; $$("[data-sort]").forEach(x => x.className = x === b ? "on" : "ghost"); load(); });
+
+// ===== Meme studio (runs fully in the browser) =====
+const cv = $("#cv"), ctx = cv.getContext("2d");
+let img = null, stickers = [];
+function draw() {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (img) { const r = Math.min(cv.width / img.width, cv.height / img.height), w = img.width * r, h = img.height * r; ctx.drawImage(img, (cv.width - w) / 2, (cv.height - h) / 2, w, h); }
+  else { ctx.fillStyle = "#555"; ctx.font = "24px sans-serif"; ctx.textAlign = "center"; ctx.fillText("📷", cv.width / 2, cv.height / 2); }
+  const size = +$("#size").value; ctx.font = `900 ${size}px Impact, Arial Black, sans-serif`; ctx.textAlign = "center";
+  ctx.lineWidth = size / 8; ctx.strokeStyle = "#000"; ctx.lineJoin = "round"; ctx.fillStyle = $("#color").value;
+  const put = (txt, y) => { txt = txt.toUpperCase(); ctx.strokeText(txt, cv.width / 2, y, cv.width - 20); ctx.fillText(txt, cv.width / 2, y, cv.width - 20); };
+  put($("#top").value, size + 10); put($("#bot").value, cv.height - 20);
+  ctx.font = "64px serif"; stickers.forEach(s => ctx.fillText(s.e, s.x, s.y));
+}
+$("#file").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (f.size > 8 * 1024 * 1024) return msg("Max 8 MB");
+  const i = new Image(); i.onload = () => { img = i; draw(); }; i.src = URL.createObjectURL(f);
+};
+["top", "bot", "size", "color"].forEach(id => $("#" + id).oninput = draw);
+$$(".stk").forEach(b => b.onclick = () => { stickers.push({ e: b.textContent, x: 80 + Math.random() * (cv.width - 160), y: 120 + Math.random() * (cv.height - 240) }); draw(); });
+$("#clr").onclick = () => { stickers = []; img = null; $("#top").value = $("#bot").value = ""; $("#file").value = ""; draw(); };
+$("#dl").onclick = () => { const a = document.createElement("a"); a.download = "meme.png"; a.href = cv.toDataURL("image/png"); a.click(); };
+
+applyLang();
+</script>
+</body>
+</html>
